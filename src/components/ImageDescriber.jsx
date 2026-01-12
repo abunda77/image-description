@@ -10,6 +10,15 @@ const ImageDescriber = () => {
     const [copied, setCopied] = useState(false);
     const fileInputRef = useRef(null);
 
+    // Cleanup object URL on unmount or when preview changes
+    React.useEffect(() => {
+        return () => {
+            if (previewUrl) {
+                URL.revokeObjectURL(previewUrl);
+            }
+        };
+    }, [previewUrl]);
+
     // Helper to convert file to base64
     const fileToGenerativePart = (file) => {
         return new Promise((resolve) => {
@@ -34,6 +43,10 @@ const ImageDescriber = () => {
                 setError('Please select a valid image file.');
                 return;
             }
+            // Revoke old URL before creating new one
+            if (previewUrl) {
+                URL.revokeObjectURL(previewUrl);
+            }
             setImage(file);
             setPreviewUrl(URL.createObjectURL(file));
             setDescription('');
@@ -49,6 +62,10 @@ const ImageDescriber = () => {
             if (!file.type.startsWith('image/')) {
                 setError('Please select a valid image file.');
                 return;
+            }
+            // Revoke old URL before creating new one
+            if (previewUrl) {
+                URL.revokeObjectURL(previewUrl);
             }
             setImage(file);
             setPreviewUrl(URL.createObjectURL(file));
@@ -74,6 +91,10 @@ const ImageDescriber = () => {
             const imagePart = await fileToGenerativePart(image);
             const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
+            if (!apiKey) {
+                throw new Error('API key not configured. Please check your .env file.');
+            }
+
             const promptText = `
         Analyze this image and generate a strict visual description based on these rules:
         
@@ -97,6 +118,10 @@ const ImageDescriber = () => {
         Generate the description now complying with all points above.
       `;
 
+            // Add timeout to prevent hanging
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
             const response = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
                 {
@@ -111,9 +136,12 @@ const ImageDescriber = () => {
                                 imagePart
                             ]
                         }]
-                    })
+                    }),
+                    signal: controller.signal
                 }
             );
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error('Failed to generate description. Please try again.');
@@ -123,15 +151,22 @@ const ImageDescriber = () => {
             const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
             if (generatedText) {
-                // Clean up any potential markdown formatting if the model adds it strictly
-                const cleanText = generatedText.trim();
+                // Sanitize and clean up response
+                const cleanText = generatedText
+                    .trim()
+                    .replace(/[<>]/g, '') // Remove potential HTML tags
+                    .substring(0, 5000); // Limit length
                 setDescription(cleanText);
             } else {
                 throw new Error('No description generated.');
             }
 
         } catch (err) {
-            setError(err.message || 'An unexpected error occurred.');
+            if (err.name === 'AbortError') {
+                setError('Request timed out. Please try again.');
+            } else {
+                setError(err.message || 'An unexpected error occurred.');
+            }
         } finally {
             setLoading(false);
         }
