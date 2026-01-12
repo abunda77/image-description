@@ -87,8 +87,8 @@ const ImageDescriber = () => {
         - Focus ONLY on: Body posture, clothing (detailed), accessories, actions, objects, environment, lighting, atmosphere, perspective.
         
         FORMATTING RULES:
-        1. Start EXACTLY with the subject and the literal text "(image reference)". 
-           Example: "a man \"(image reference)\" standing..." or "a woman \"(image reference)\" sitting..." or "a red car \"(image reference)\" parked..."
+        1. Start EXACTLY with the subject and the literal text "(image reference)".
+           Example: "a man "(image reference)" standing..." or "a woman "(image reference)" sitting..." or "a red car "(image reference)" parked..."
         2. Do NOT use opening phrases like "This image shows" or "A photo of".
         3. Output must be a SINGLE continuous paragraph.
         4. English only.
