@@ -1,0 +1,21 @@
+# Copy this configuration to your OLS vHost config
+# Location: CyberPanel → Websites → Manage → vHost Conf
+# Or manually at: /usr/local/lsws/conf/vhosts/imgdesc.produkmastah.com/vhconf.conf
+
+# Add this EXTERNAL PROCESSOR section (usually after scripthandler)
+extprocessor nodejs_backend {
+  type                    proxy
+  address                 http://127.0.0.1:3001
+  maxConns                100
+  pcKeepAliveTimeout      60
+  initTimeout             60
+  retryTimeout            0
+  respBuffer              0
+}
+
+# Add this CONTEXT section (usually before vhssl)
+context /api {
+  type                    proxy
+  handler                 nodejs_backend
+  addDefaultCharset       off
+}
