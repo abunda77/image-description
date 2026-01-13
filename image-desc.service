@@ -1,0 +1,26 @@
+[Unit]
+Description=Image Description Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/path/to/image-desc
+Environment="NODE_ENV=production"
+Environment="PORT=3001"
+EnvironmentFile=/path/to/image-desc/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/path/to/image-desc/server.log
+StandardError=append:/path/to/image-desc/server.log
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/path/to/image-desc
+
+[Install]
+WantedBy=multi-user.target

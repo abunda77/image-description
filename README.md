@@ -70,15 +70,48 @@ server {
 }
 ```
 
-### 4. Process Manager (PM2)
-Gunakan PM2 untuk production:
+### 4. Process Management
 
+Ada 2 metode untuk menjalankan server di production:
+
+#### Metode 1: nohup (Simple & Quick)
 ```bash
-npm install -g pm2
-pm2 start server.js --name "image-desc"
-pm2 startup
-pm2 save
+# Make scripts executable
+chmod +x *.sh
+
+# Restart server dengan rebuild
+./restart-server.sh
+
+# Check status
+./status-server.sh
+
+# Stop server
+./stop-server.sh
+
+# View logs
+tail -f server.log
 ```
+
+#### Metode 2: systemd (Recommended for Production)
+```bash
+# Edit service file
+nano image-desc.service
+# Sesuaikan path dan user
+
+# Install service
+sudo cp image-desc.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable image-desc
+sudo systemctl start image-desc
+
+# Check status
+sudo systemctl status image-desc
+
+# View logs
+sudo journalctl -u image-desc -f
+```
+
+**Lihat dokumentasi lengkap di:** [SERVER-MANAGEMENT.md](SERVER-MANAGEMENT.md)
 
 ### 5. Deployment dengan .env File
 Untuk keamanan, gunakan file `.env` di production:
@@ -93,4 +126,7 @@ NODE_ENV=production
 Kemudian jalankan:
 ```bash
 node server.js  # Akan otomatis baca .env
+# atau
+./restart-server.sh
 ```
+

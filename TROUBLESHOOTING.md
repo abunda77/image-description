@@ -11,21 +11,27 @@
 
 #### 1. Cek apakah server running
 ```bash
-# Cek status PM2
-pm2 status
+# Cek status dengan script
+./status-server.sh
 
-# Atau cek port
+# Atau cek port manual
 netstat -tlnp | grep 3001
 # Windows: netstat -ano | findstr :3001
+
+# Atau dengan lsof
+lsof -i:3001
 ```
 
 #### 2. Cek log server
 ```bash
-# PM2 logs
-pm2 logs image-desc
+# Lihat log (nohup method)
+tail -f server.log
 
-# Atau lihat file log
-pm2 logs image-desc --lines 100
+# Atau lihat semua log
+cat server.log
+
+# Systemd method
+sudo journalctl -u image-desc -f
 ```
 
 #### 3. Restart server
@@ -34,17 +40,17 @@ pm2 logs image-desc --lines 100
 chmod +x restart-server.sh
 ./restart-server.sh
 
-# Atau manual
-pm2 restart image-desc
+# Atau systemd
+sudo systemctl restart image-desc
 ```
 
 #### 4. Cek environment variables
 ```bash
-# Pastikan API key sudah di-set
-pm2 env image-desc
+# Cek file .env
+cat .env
 
-# Jika belum ada, update
-pm2 restart image-desc --update-env
+# Pastikan GEMINI_API_KEY ada
+grep GEMINI_API_KEY .env
 ```
 
 #### 5. Test endpoint
@@ -89,19 +95,31 @@ ls -la dist/
 npm run build
 
 # 3. Restart server
-pm2 restart image-desc
+./restart-server.sh
+# atau systemd:
+sudo systemctl restart image-desc
 ```
 
 ## Memory Issues
 
 ### Jika server crash karena memory:
-```bash
-# Increase PM2 memory limit
-pm2 start server.js --name "image-desc" --max-memory-restart 500M
 
-# Atau edit ecosystem config
-pm2 ecosystem
+**Systemd method:**
+```bash
+# Edit service file
+sudo nano /etc/systemd/system/image-desc.service
+
+# Tambahkan di section [Service]:
+MemoryMax=500M
+MemoryHigh=400M
+
+# Reload dan restart
+sudo systemctl daemon-reload
+sudo systemctl restart image-desc
 ```
+
+**Nohup method:**
+Monitor dengan `htop` atau restart server secara berkala.
 
 ## Quick Debug Commands
 
@@ -112,14 +130,20 @@ ls -la server.js
 # Check Node version (min: v18+)
 node --version
 
-# Test server langsung (tanpa PM2)
+# Check server status
+./status-server.sh
+
+# Test server langsung (foreground untuk debug)
 node server.js
 
-# Monitor real-time logs
-pm2 logs image-desc --raw
+# Monitor real-time logs (nohup)
+tail -f server.log
 
-# View server metrics
-pm2 monit
+# Monitor with systemd
+sudo journalctl -u image-desc -f
+
+# Check process
+ps aux | grep node
 ```
 
 ## Production Deployment Checklist
@@ -128,18 +152,53 @@ pm2 monit
 - [ ] File `.env` ada dengan `GEMINI_API_KEY`
 - [ ] Port 3001 tidak digunakan aplikasi lain
 - [ ] Firewall allow port 3001
-- [ ] PM2 installed globally
+- [ ] Scripts executable (`chmod +x *.sh`)
 - [ ] Server.js readable dan executable
 - [ ] Folder `dist/` ada dan berisi build result
 
 ## Restart Sequence
 
+### Nohup method:
 ```bash
-# Full restart sequence
-pm2 stop image-desc
+./stop-server.sh
 npm run build
-pm2 start server.js --name "image-desc"
-pm2 save
+./start-server.sh
+
+# Atau langsung
+./restart-server.sh
+```
+
+### Systemd method:
+```bash
+# Rebuild
+npm run build
+
+# Restart service
+sudo systemctl restart image-desc
+
+# Check status
+sudo systemctl status image-desc
+```
+
+## Server Won't Start
+
+### Debug steps:
+```bash
+# 1. Kill any existing process on port
+kill -9 $(lsof -ti:3001)
+
+# 2. Remove PID file
+rm -f server.pid
+
+# 3. Try starting in foreground to see errors
+node server.js
+
+# 4. Check for syntax errors
+node --check server.js
+
+# 5. Check permissions
+ls -la server.js
+chmod +x *.sh
 ```
 
 ## Contact Debug Info
@@ -147,9 +206,24 @@ pm2 save
 Jika masih ada masalah, kumpulkan info berikut:
 ```bash
 node --version
-pm2 --version
-pm2 logs image-desc --lines 50 --nostream
+./status-server.sh
+tail -n 50 server.log
 ls -la dist/
 cat .env | grep -v GEMINI_API_KEY  # Don't show actual key
 curl http://localhost:3001/api/health
 ```
+
+## Common Issues & Quick Fixes
+
+| Issue | Quick Fix |
+|-------|-----------|
+| Port already in use | `kill -9 $(lsof -ti:3001)` |
+| PID file exists but no process | `rm -f server.pid && ./start-server.sh` |
+| Can't execute script | `chmod +x *.sh` |
+| 404 on API | Check logs: `tail -f server.log` |
+| Server won't stop | `kill -9 $(lsof -ti:3001)` |
+| No logs | Check if `server.log` exists and is writable |
+
+## See Also
+- [SERVER-MANAGEMENT.md](SERVER-MANAGEMENT.md) - Complete server management guide
+- [README.md](README.md) - General documentation
