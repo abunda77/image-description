@@ -117,12 +117,12 @@ app.post('/api/generate-description', async (req, res) => {
 });
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // Serve index.html for all other routes (SPA fallback)
-app.use((req, res) => {
+app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
