@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Copy, RefreshCw, AlertCircle, Check, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Upload, Copy, RefreshCw, AlertCircle, Check, Image as ImageIcon, Sparkles, X } from 'lucide-react';
 
 const ImageDescriber = () => {
     const [image, setImage] = useState(null);
@@ -77,6 +77,23 @@ const ImageDescriber = () => {
 
     const handleDragOver = (event) => {
         event.preventDefault();
+    };
+
+    const handleReset = () => {
+        // Cleanup object URL
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+        }
+        // Reset all states
+        setImage(null);
+        setPreviewUrl(null);
+        setDescription('');
+        setError('');
+        setCopied(false);
+        // Reset file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
     };
 
     const generateDescription = async () => {
@@ -255,30 +272,46 @@ const ImageDescriber = () => {
                             )}
                         </div>
 
-                        <button
-                            onClick={generateDescription}
-                            disabled={!image || loading}
-                            className={`
-                w-full py-4 px-6 rounded-lg font-semibold text-lg flex items-center justify-center gap-3 transition-all shadow-sm
-                ${!image
-                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                    : loading
-                                        ? 'bg-indigo-400 text-white cursor-wait'
-                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:shadow-md active:transform active:scale-[0.98]'}
-              `}
-                        >
-                            {loading ? (
-                                <>
-                                    <RefreshCw className="animate-spin" />
-                                    Analyzing...
-                                </>
-                            ) : (
-                                <>
-                                    <Sparkles size={20} />
-                                    Generate Description
-                                </>
-                            )}
-                        </button>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={generateDescription}
+                                disabled={!image || loading}
+                                className={`
+                  flex-1 py-4 px-6 rounded-lg font-semibold text-lg flex items-center justify-center gap-3 transition-all shadow-sm
+                  ${!image
+                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                        : loading
+                                            ? 'bg-indigo-400 text-white cursor-wait'
+                                            : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:shadow-md active:transform active:scale-[0.98]'}
+                `}
+                            >
+                                {loading ? (
+                                    <>
+                                        <RefreshCw className="animate-spin" />
+                                        Analyzing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles size={20} />
+                                        Generate Description
+                                    </>
+                                )}
+                            </button>
+
+                            <button
+                                onClick={handleReset}
+                                disabled={!image || loading}
+                                className={`
+                  py-4 px-6 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all shadow-sm
+                  ${!image || loading
+                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                        : 'bg-white border-2 border-slate-300 text-slate-700 hover:border-red-400 hover:text-red-600 hover:bg-red-50 active:transform active:scale-[0.98]'}
+                `}
+                                title="Reset"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
 
                         {error && (
                             <div className="p-4 bg-red-50 text-red-600 rounded-lg flex items-start gap-3 border border-red-100">
