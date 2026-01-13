@@ -14,117 +14,124 @@ const DIST_DIR = path.join(__dirname, 'dist');
 
 // MIME types untuk static files
 const MIME_TYPES = {
-    '.html': 'text/html',
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon',
-    '.webp': 'image/webp',
-    '.woff': 'font/woff',
-    '.woff2': 'font/woff2',
-    '.ttf': 'font/ttf',
-    '.eot': 'application/vnd.ms-fontobject'
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.webp': 'image/webp',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.eot': 'application/vnd.ms-fontobject'
 };
 
 // Helper: Parse JSON body
 function parseBody(req) {
-    return new Promise((resolve, reject) => {
-        let body = '';
-        req.on('data', chunk => {
-            body += chunk.toString();
-            // Limit body size untuk security (10MB)
-            if (body.length > 10 * 1024 * 1024) {
-                req.connection.destroy();
-                reject(new Error('Body too large'));
-            }
-        });
-        req.on('end', () => {
-            try {
-                resolve(body ? JSON.parse(body) : {});
-            } catch (err) {
-                reject(err);
-            }
-        });
-        req.on('error', reject);
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+      // Limit body size untuk security (10MB)
+      if (body.length > 10 * 1024 * 1024) {
+        req.connection.destroy();
+        reject(new Error('Body too large'));
+      }
     });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 // Helper: Send JSON response
 function sendJSON(res, data, statusCode = 200) {
-    res.writeHead(statusCode, {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type'
-    });
-    res.end(JSON.stringify(data));
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type'
+  });
+  res.end(JSON.stringify(data));
 }
 
 // Helper: Serve static file
 function serveStaticFile(filePath, res) {
-    fs.readFile(filePath, (err, data) => {
-        if (err) {
-            if (err.code === 'ENOENT') {
-                // File not found, serve index.html (SPA fallback)
-                const indexPath = path.join(DIST_DIR, 'index.html');
-                fs.readFile(indexPath, (err, data) => {
-                    if (err) {
-                        sendJSON(res, { error: 'Page not found' }, 404);
-                    } else {
-                        res.writeHead(200, { 'Content-Type': 'text/html' });
-                        res.end(data);
-                    }
-                });
-            } else {
-                sendJSON(res, { error: 'Server error' }, 500);
-            }
-        } else {
-            const ext = path.extname(filePath);
-            const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
-            res.writeHead(200, { 'Content-Type': mimeType });
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      if (err.code === 'ENOENT') {
+        // File not found, serve index.html (SPA fallback)
+        const indexPath = path.join(DIST_DIR, 'index.html');
+        fs.readFile(indexPath, (err, data) => {
+          if (err) {
+            sendJSON(res, { error: 'Page not found' }, 404);
+          } else {
+            res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(data);
-        }
-    });
+          }
+        });
+      } else {
+        sendJSON(res, { error: 'Server error' }, 500);
+      }
+    } else {
+      const ext = path.extname(filePath);
+      const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': mimeType });
+      res.end(data);
+    }
+  });
 }
 
 // Main request handler
 const server = http.createServer(async (req, res) => {
-    const { method, url } = req;
+  const { method, url } = req;
 
-    // CORS preflight
-    if (method === 'OPTIONS') {
-        res.writeHead(204, {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type'
-        });
-        res.end();
+  // Parse URL to get pathname (remove query params)
+  const pathname = url.split('?')[0];
+
+  // Log incoming requests for debugging
+  console.log(`[${new Date().toISOString()}] ${method} ${pathname}`);
+
+  // CORS preflight
+  if (method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+    res.end();
+    return;
+  }
+
+  try {
+    // API: Generate Description
+    if (method === 'POST' && pathname === '/api/generate-description') {
+      console.log('📸 Processing image description request...');
+      const body = await parseBody(req);
+      const { imageData, mimeType } = body;
+
+      if (!imageData || !mimeType) {
+        sendJSON(res, { error: 'Image data and mimeType are required' }, 400);
         return;
-    }
+      }
 
-    try {
-        // API: Generate Description
-        if (method === 'POST' && url === '/api/generate-description') {
-            const body = await parseBody(req);
-            const { imageData, mimeType } = body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        sendJSON(res, { error: 'API key not configured on server' }, 500);
+        return;
+      }
 
-            if (!imageData || !mimeType) {
-                sendJSON(res, { error: 'Image data and mimeType are required' }, 400);
-                return;
-            }
-
-            const apiKey = process.env.GEMINI_API_KEY;
-            if (!apiKey) {
-                sendJSON(res, { error: 'API key not configured on server' }, 500);
-                return;
-            }
-
-            const promptText = `
+      const promptText = `
       Analyze this image and generate a strict visual description based on these rules:
 
       CRITICAL NEGATIVE CONSTRAINTS (DO NOT MENTION):
@@ -147,93 +154,97 @@ const server = http.createServer(async (req, res) => {
       Generate the description now complying with all points above.
     `;
 
-            const imagePart = {
-                inlineData: {
-                    data: imageData,
-                    mimeType: mimeType
-                }
-            };
-
-            // Add timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: promptText },
-                                imagePart
-                            ]
-                        }]
-                    }),
-                    signal: controller.signal
-                }
-            );
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error('Failed to generate description');
-            }
-
-            const data = await response.json();
-            const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-            if (generatedText) {
-                const cleanText = generatedText
-                    .trim()
-                    .replace(/[<>]/g, '')
-                    .substring(0, 5000);
-                sendJSON(res, { description: cleanText });
-            } else {
-                sendJSON(res, { error: 'No description generated' }, 500);
-            }
-
-            return;
+      const imagePart = {
+        inlineData: {
+          data: imageData,
+          mimeType: mimeType
         }
+      };
 
-        // API: Health check
-        if (method === 'GET' && url === '/api/health') {
-            sendJSON(res, { status: 'OK', timestamp: new Date().toISOString() });
-            return;
+      // Add timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                imagePart
+              ]
+            }]
+          }),
+          signal: controller.signal
         }
+      );
 
-        // Static files / SPA fallback
-        if (method === 'GET') {
-            let filePath;
+      clearTimeout(timeoutId);
 
-            if (url === '/') {
-                filePath = path.join(DIST_DIR, 'index.html');
-            } else {
-                filePath = path.join(DIST_DIR, url);
-            }
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Gemini API error:', errorText);
+        throw new Error('Failed to generate description');
+      }
 
-            serveStaticFile(filePath, res);
-            return;
-        }
+      const data = await response.json();
+      const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-        // Method not allowed
-        sendJSON(res, { error: 'Method not allowed' }, 405);
+      if (generatedText) {
+        const cleanText = generatedText
+          .trim()
+          .replace(/[<>]/g, '')
+          .substring(0, 5000);
+        console.log('✅ Description generated successfully');
+        sendJSON(res, { description: cleanText });
+      } else {
+        console.error('❌ No description in response');
+        sendJSON(res, { error: 'No description generated' }, 500);
+      }
 
-    } catch (err) {
-        console.error('Server error:', err);
-        if (err.name === 'AbortError') {
-            sendJSON(res, { error: 'Request timed out' }, 408);
-        } else {
-            sendJSON(res, { error: err.message || 'Internal server error' }, 500);
-        }
+      return;
     }
+
+    // API: Health check
+    if (method === 'GET' && pathname === '/api/health') {
+      sendJSON(res, { status: 'OK', timestamp: new Date().toISOString() });
+      return;
+    }
+
+    // Static files / SPA fallback
+    if (method === 'GET') {
+      let filePath;
+
+      if (pathname === '/') {
+        filePath = path.join(DIST_DIR, 'index.html');
+      } else {
+        filePath = path.join(DIST_DIR, pathname);
+      }
+
+      serveStaticFile(filePath, res);
+      return;
+    }
+
+    // Method not allowed
+    sendJSON(res, { error: 'Method not allowed' }, 405);
+
+  } catch (err) {
+    console.error('💥 Server error:', err);
+    if (err.name === 'AbortError') {
+      sendJSON(res, { error: 'Request timed out' }, 408);
+    } else {
+      sendJSON(res, { error: err.message || 'Internal server error' }, 500);
+    }
+  }
 });
 
 server.listen(PORT, () => {
-    console.log(`✅ Simple HTTP Server running on port ${PORT}`);
-    console.log(`📁 Serving static files from: ${DIST_DIR}`);
-    console.log(`🌐 URL: http://localhost:${PORT}`);
+  console.log(`✅ Simple HTTP Server running on port ${PORT}`);
+  console.log(`📁 Serving static files from: ${DIST_DIR}`);
+  console.log(`🌐 URL: http://localhost:${PORT}`);
 });
