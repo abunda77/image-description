@@ -114,8 +114,38 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    // API: Verify Auth
+    if (method === 'POST' && pathname === '/api/verify-auth') {
+      const body = await parseBody(req);
+      const { password } = body;
+      const appPassword = process.env.APP_PASSWORD;
+
+      if (!appPassword) {
+        // If no password configured, auth is always valid
+        sendJSON(res, { valid: true });
+        return;
+      }
+
+      if (password === appPassword) {
+        sendJSON(res, { valid: true });
+      } else {
+        sendJSON(res, { valid: false }, 401);
+      }
+      return;
+    }
+
     // API: Generate Description
     if (method === 'POST' && pathname === '/api/generate-description') {
+      // Password protection check
+      const appPassword = process.env.APP_PASSWORD;
+      if (appPassword) {
+        const clientPassword = req.headers['x-app-password'];
+        if (clientPassword !== appPassword) {
+          sendJSON(res, { error: 'Unauthorized: Invalid or missing password' }, 401);
+          return;
+        }
+      }
+
       console.log('📸 Processing image description request...');
       const body = await parseBody(req);
       const { imageData, mimeType } = body;

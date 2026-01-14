@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 function ImageDescriber() {
     const [image, setImage] = useState(null);
@@ -7,6 +7,66 @@ function ImageDescriber() {
     const [error, setError] = useState('');
     const [description, setDescription] = useState('');
     const [copied, setCopied] = useState(false);
+
+    // Auth state
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [authChecking, setAuthChecking] = useState(true);
+    const [passwordInput, setPasswordInput] = useState('');
+    const [authError, setAuthError] = useState('');
+
+    useEffect(() => {
+        checkAuth();
+    }, []);
+
+    const checkAuth = async () => {
+        const storedPassword = sessionStorage.getItem('app_password');
+
+        try {
+            // Always verify with server - if no password configured on server, it returns valid: true
+            const res = await fetch('/api/verify-auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: storedPassword || '' })
+            });
+
+            const data = await res.json();
+            if (data.valid) {
+                setIsAuthenticated(true);
+            } else {
+                // Only clear if we had a password that is now invalid
+                if (storedPassword) sessionStorage.removeItem('app_password');
+            }
+        } catch (e) {
+            console.error("Auth check failed", e);
+        } finally {
+            setAuthChecking(false);
+        }
+    };
+
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setAuthChecking(true);
+        setAuthError('');
+
+        try {
+            const res = await fetch('/api/verify-auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: passwordInput })
+            });
+
+            if (res.ok) {
+                sessionStorage.setItem('app_password', passwordInput);
+                setIsAuthenticated(true);
+            } else {
+                setAuthError('Incorrect password');
+            }
+        } catch (e) {
+            setAuthError('Login failed. Please try again.');
+        } finally {
+            setAuthChecking(false);
+        }
+    };
 
     const generateDescription = async () => {
         if (!image) return;
@@ -38,6 +98,7 @@ function ImageDescriber() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'x-app-password': sessionStorage.getItem('app_password') || ''
                 },
                 body: JSON.stringify({
                     imageData: imageData,
@@ -127,6 +188,62 @@ function ImageDescriber() {
         { label: 'Pose & Action', active: true, type: 'positive' },
         { label: 'Environment', active: true, type: 'positive' },
     ];
+
+    if (authChecking) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full">
+                    <div className="text-center mb-6">
+                        <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                        </div>
+                        <h2 className="text-2xl font-bold text-gray-800">Authentication Required</h2>
+                        <p className="text-gray-600 mt-2">Please enter the password to access this application.</p>
+                    </div>
+
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <input
+                                type="password"
+                                value={passwordInput}
+                                onChange={(e) => setPasswordInput(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                placeholder="Enter password"
+                                autoFocus
+                            />
+                        </div>
+
+                        {authError && (
+                            <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg flex items-center">
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {authError}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center"
+                        >
+                            Access Application
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -278,13 +395,13 @@ function ImageDescriber() {
                                     <div
                                         key={index}
                                         className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${constraint.type === 'negative'
-                                                ? 'bg-red-50 text-red-700'
-                                                : 'bg-green-50 text-green-700'
+                                            ? 'bg-red-50 text-red-700'
+                                            : 'bg-green-50 text-green-700'
                                             }`}
                                     >
                                         <div className={`w-2 h-2 rounded-full ${constraint.type === 'negative'
-                                                ? 'bg-red-500'
-                                                : 'bg-green-500'
+                                            ? 'bg-red-500'
+                                            : 'bg-green-500'
                                             }`}></div>
                                         <span className="text-sm font-medium">{constraint.label}</span>
                                     </div>
